@@ -1,36 +1,220 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Setting Up `next-intl` with Next.js
 
-## Getting Started
+This guide explains how to set up and configure `next-intl` in a Next.js project to enable multilingual support.
 
-First, run the development server:
+---
+
+## Installation
+
+1. Install the required package:
+   ```bash
+   npm install next-intl
+   ```
+
+---
+
+## Folder Structure
+
+Organize your project to keep translation files and configuration clean:
+
+```
+project-root/
+├── src/
+│   └── messages/
+│       ├── en/
+│       │   └── common.json
+│       └── ar/
+│           └── common.json
+├── src/
+│   ├── components/
+│   │   └── ExampleComponent.tsx
+│   ├── app/
+│   │   └── [locale]/
+│   │       ├── layout.tsx
+│   │       ├── page.tsx
+│   │       ├── loading.tsx
+│   │       └── not-found.tsx
+│   │   ├── page.tsx
+│   │   └── layout.tsx
+│   ├── i18n/
+│   │   ├── request.ts
+│   │   └── routing.ts
+├── package.json
+└── next.config.js
+```
+
+---
+
+## Configuration
+
+### 1. Update the `next.config.js` file
+
+This file contains the configuration for `next-intl`:
+
+```javascript
+import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin();
+
+const nextConfig: NextConfig = {};
+
+export default withNextIntl(nextConfig);
+```
+
+---
+
+## i18n Setup
+
+### 1. Create `request.ts` File
+
+This file handles the request configuration for translations:
+
+```typescript
+import { getRequestConfig } from "next-intl/server";
+import { Locale, routing } from "./routing";
+
+export default getRequestConfig(async ({ requestLocale }) => {
+  // This typically corresponds to the `[locale]` segment
+  let locale = await requestLocale;
+
+  // Ensure that a valid locale is used
+  if (!locale || !routing.locales.includes(locale as Locale)) {
+    locale = routing.defaultLocale;
+  }
+
+  return {
+    locale,
+    messages: (await import(`@/messages/${locale}.json`)).default,
+  };
+});
+```
+
+### 2. Create `routing.ts` File
+
+This file defines the routing and navigation for the locales:
+
+```typescript
+import { createNavigation } from "next-intl/navigation";
+import { defineRouting } from "next-intl/routing";
+
+export const routing = defineRouting({
+  // A list of all locales that are supported
+  locales: ["en", "ar"],
+
+  // Used when no locale matches
+  defaultLocale: "en",
+});
+
+// Lightweight wrappers around Next.js' navigation APIs
+// that will consider the routing configuration
+export type Locale = (typeof routing.locales)[number];
+export const { Link, redirect, usePathname, useRouter } =
+  createNavigation(routing);
+```
+
+---
+
+## Adding Translations
+
+1. Create JSON files for each locale in the `src/messages/` folder:
+
+   ### `src/messages/en/common.json`
+   ```json
+   {
+     "welcome": "Welcome to our website!",
+     "greeting": "Hello, how are you?"
+   }
+   ```
+
+   ### `src/messages/ar/common.json`
+   ```json
+   {
+     "welcome": "مرحبًا بك في موقعنا!",
+     "greeting": "مرحبًا، كيف حالك؟"
+   }
+   ```
+
+---
+
+## Integrating with the Application
+
+### 1. Wrap the Application Layout
+
+Modify the `layout.tsx` inside the `[locale]` folder to include translations:
+
+```typescript
+import { NextIntlClientProvider } from "next-intl";
+import { ReactNode } from "react";
+import { notFound } from "next/navigation";
+
+export function generateStaticParams() {
+  return [{ locale: "en" }, { locale: "ar" }];
+}
+
+export default async function LocaleLayout({
+  children,
+  params,
+}: {
+  children: ReactNode;
+  params: { locale: string };
+}) {
+  let messages;
+  try {
+    messages = (await import(`@/messages/${params.locale}.json`)).default;
+  } catch (error) {
+    notFound();
+  }
+
+  return (
+    <html lang={params.locale}>
+      <body>
+        <NextIntlClientProvider locale={params.locale} messages={messages}>
+          {children}
+        </NextIntlClientProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+### 2. Use Translations in Components
+
+Import and use translations in any component:
+
+```typescript
+import { useTranslations } from "next-intl";
+
+const ExampleComponent = () => {
+  const t = useTranslations("common");
+
+  return (
+    <div>
+      <h1>{t("welcome")}</h1>
+      <p>{t("greeting")}</p>
+    </div>
+  );
+};
+
+export default ExampleComponent;
+```
+
+---
+
+## Testing
+
+Run the development server and test the translations:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Navigate to `/en` or `/ar` to test the locales.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deployment Notes
 
-## Learn More
+Ensure the `src/messages/` folder is included in the build process, and the routing configuration is correctly set up in production.
 
-To learn more about Next.js, take a look at the following resources:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
