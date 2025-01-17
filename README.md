@@ -144,39 +144,41 @@ export const { Link, redirect, usePathname, useRouter } =
 Modify the `layout.tsx` inside the `[locale]` folder to include translations:
 
 ```typescript
-import { NextIntlClientProvider } from "next-intl";
-import { ReactNode } from "react";
+import { NextIntlClientProvider, } from "next-intl";
+import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
+import { Metadata } from "next";
 
-export function generateStaticParams() {
-  return [{ locale: "en" }, { locale: "ar" }];
+import "../globals.css";
+interface LocaleLayoutProps {
+  children: React.ReactNode;
+  params: Promise<{ locale: string }>; // Change this to a Promise
 }
-
+export const metadata: Metadata = {
+  title: "App",
+  description: "Description",
+};
 export default async function LocaleLayout({
   children,
   params,
-}: {
-  children: ReactNode;
-  params: { locale: string };
-}) {
-  let messages;
-  try {
-    messages = (await import(`@/messages/${params.locale}.json`)).default;
-  } catch (error) {
+}: LocaleLayoutProps) {
+  const { locale } = await params; // Await the params to get the locale
+  const messages = await getMessages({ locale });
+  if (!messages) {
     notFound();
   }
+  const direction = locale === "ar" || locale === "he" ? "rtl" : "ltr";
 
   return (
-    <html lang={params.locale}>
-      <body>
-        <NextIntlClientProvider locale={params.locale} messages={messages}>
+    <html lang={locale} dir={direction}>
+      <body className="">
+        <NextIntlClientProvider messages={messages} locale={locale}>
           {children}
         </NextIntlClientProvider>
       </body>
     </html>
   );
 }
-```
 
 ### 2. Use Translations in Components
 
